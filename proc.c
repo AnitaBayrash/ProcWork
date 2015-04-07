@@ -72,6 +72,44 @@ ssize_t operation_write(struct file *filp, const char *buffer, size_t count, lof
 	return count;
 }
 
+ssize_t result_read(struct file *filp, char *buffer, size_t count, loff_t *offp)
+{
+	int length, result = 0;
+	char number[12];
+	switch(operation){
+	case '+':
+		result = first + second;
+		break;
+	case '-':
+                result = first - second;
+                break;
+	case '*':
+                result = first * second;
+                break;
+	case '/':
+                if (second != 0)
+			result = first / second;
+		else
+			printk(KERN_INFO "Division by zero.\n");
+                break;
+	default:
+		break;
+	}
+	length = sprintf(number, "%d\n", result);
+
+	if (count < length)
+		return -EINVAL;
+	if (*offp >= length)
+                return 0;
+	if (*offp + count > length)
+        	count = length - *offp;
+
+	strcpy(buffer, number);
+	*offp += length;
+
+	return length;
+}
+
 static const struct file_operations first_operand_fops = {
 	.owner = THIS_MODULE,
 	.write = first_operand_write
@@ -87,12 +125,19 @@ static const struct file_operations operation_fops = {
 	.write = operation_write
 };
 
+static const struct file_operations result_fops = {
+	.owner = THIS_MODULE,
+	.read = result_read
+};
+
+
 static int __init initialize_proc(void)
 {
 	printk(KERN_INFO "Module loaded.\n");
 	proc_create("first_operand_proc", 0666, NULL, &first_operand_fops);
 	proc_create("second_operand_proc", 0666, NULL, &second_operand_fops);
 	proc_create("operation_proc", 0666, NULL, &operation_fops);
+	proc_create("result_proc", 0, NULL, &result_fops);
 	return 0;
 }
 
@@ -103,6 +148,8 @@ static void __exit exit_proc(void)
 	remove_proc_entry("first_operand_proc", NULL);
 	remove_proc_entry("second_operand_proc", NULL);
 	remove_proc_entry("operation_proc", NULL);
+	remove_proc_entry("result_proc", NULL);
+	printk(KERN_INFO "Module removed.\n");
 }
 
 module_exit(exit_proc);
